@@ -1,0 +1,153 @@
+import requests
+import os
+
+# lower.() converts their answer to lower case!
+user = input("Who is the user? Olivia/Megan/Carina ")
+if user.lower() == "megan":
+    app_id = "ddaf1b46"
+    app_key = "22ca23af7481a2718c3e3889bac0cf52"
+    app_id2 = "2a2288a1"
+    app_key2 = "998ae6088a8722e02877e116065ab19d"
+elif user.lower() == "olivia":
+    app_id = "d13f3378"
+    app_key = "c565b141f1289b921f22834414f67eb0"
+    app_id2 = '4208c2da'
+    app_key2 = '9dc61e5ffc33ad321295f0bf14bc14e8'
+elif user.lower() == "carina":
+    app_id = "5e6ca794"
+    app_key = "eba81e89efdb936fe134d221d5bde123"
+    app_id2 = 'd7928249'
+    app_key2 = 'f26434c063d7a68e7508bd4d0bd6e445'
+else:
+    print("That's not quite right. Did you make a spelling mistake?")
+    exit()
+
+dietary_list = ["celery-free","crustacean-free","dairy-free","egg-free","fish-free",
+"gluten-free", "immuno-supportive","keto-friendly","kidney-friendly","kosher","low-potassium",
+"low-sugar","lupine-free","Mediterranean","mollusk-free","mustard-free","No-oil-added",
+"paleo","peanut-free","pecatarian","pork-free","red-meat-free","sesame-free","shellfish-free",
+"soy-free","sugar-conscious","sulfite-free","tree-nut-free","vegan","vegetarian","wheat-free"]
+
+def recipe_search_ingr(ingredient,meal_Type,dietary_requirements):
+    url = "https://api.edamam.com/search?q={}&mealType={}&health={}&app_id={}&app_key={}".format(ingredient, meal_Type, dietary_requirements, app_id, app_key)
+    result = requests.get(url)
+    data = result.json()
+    return data["hits"]
+
+def recipe_search_nodiet(ingredient,meal_Type):
+    url = "https://api.edamam.com/search?q={}&mealType={}&app_id={}&app_key={}".format(ingredient, meal_Type, app_id, app_key)
+    result = requests.get(url)
+    data = result.json()
+    return data["hits"]
+
+# New API search for ingredient nutrition - total weight, calories and total nutrients (new API search, app id & key needed)
+# access point https://api.edamam.com/api/nutrition-data
+def nutrition_search(ingredient):
+    result = requests.get('https://api.edamam.com/api/nutrition-data?app_id={}&app_key={}&nutrition-type=logging&ingr={}'.format(app_id2, app_key2, ingredient))
+    data = result.json()
+    return data["totalWeight"]
+
+def nutrition_search_calories(ingredient):
+    result = requests.get('https://api.edamam.com/api/nutrition-data?app_id={}&app_key={}&nutrition-type=logging&ingr={}'.format(app_id2, app_key2, ingredient))
+    data = result.json()
+    return data['calories']
+
+def nutrition_search_totalnutrients(ingredient):
+    result = requests.get('https://api.edamam.com/api/nutrition-data?app_id={}&app_key={}&nutrition-type=logging&ingr={}'.format(app_id2, app_key2, ingredient))
+    data = result.json()
+    return data['totalNutrients']
+
+try:
+    def run():
+        # User inputs
+        ingredient = input("Enter an ingredient you would like to use: ")
+
+        # Get recipe information from API
+
+        meal_Type = input("What meal type are you looking for? Breakfast/Brunch/Lunch/Snack/Dinner ")
+        if meal_Type.lower() in ["breakfast","brunch","lunch","snack","dinner"]:
+            pass
+        else:
+            exit()
+
+        yes_or_no = input("Do you have any dietary requirements? yes/no")
+        if yes_or_no.lower() == "yes":
+            print("Which one are you? Please choose from the list:")
+            print(*dietary_list,sep='\n')
+            dietary_requirements = input("")
+
+            if dietary_requirements in dietary_list:
+                pass
+            else:
+                exit()
+
+        elif yes_or_no.lower() == "no":
+            pass
+
+        else:
+            exit()
+
+        # print ingredient nutritional data for calories, energy, fat, sugar, carbohydrate, protein, sodium
+        # ingredient nutrition results based on expected serving info
+        results = nutrition_search(ingredient)
+        print('\n' + 'Nutritional information for: {}'.format(ingredient))
+        print('Nutritional information is based on a ' + str(results) + 'g serving.')
+        results = nutrition_search_calories(ingredient)
+        print('Total Calories: ' + str(results))
+        results = nutrition_search_totalnutrients(ingredient)
+        print('Energy: ' + str(results['ENERC_KCAL']['quantity']) + ' Kcal')
+        print('Fat: ' + str(results['FAT']['quantity']) + 'g')
+        print('Sugar: ' + str(results['SUGAR']['quantity']) + 'g')
+        print('Carbohydrates: ' + str(results['CHOCDF']['quantity']) + 'g')
+        print('Protein: ' + str(results['PROCNT']['quantity']) + 'g')
+        print('Sodium: ' + str(results['NA']['quantity']) + 'mg')
+        print('\n' + 'Please find the list of recipes for {} below;'.format(ingredient))
+
+        # Get recipe information from API
+        if yes_or_no.lower() == "yes":
+            results = recipe_search_ingr(ingredient, meal_Type, dietary_requirements)
+
+        else:
+            results = recipe_search_nodiet(ingredient, meal_Type)
+
+        # Create empty list to add recipe information to
+        recipe_results = []
+
+        # Loop through each recipe
+        for results in results:
+            recipe = results["recipe"]
+            label = recipe["label"]
+            url = recipe["url"]
+            calories = recipe["calories"]
+
+            # Append recipe info to list
+            recipe_results.append([label, url, calories])
+
+        # To order the list created by calories, not weight (ascending) - Googled this
+        recipe_results.sort(key=lambda x: x[2])
+
+        # If results file doesn't exist, delete it so get new file on each rerun
+        if os.path.exists("project.txt"):
+            os.remove("project.txt")
+
+        # Open new text file to append results to
+        with open("project.txt", "a") as file:
+            for ordered_recipe in recipe_results:
+                # Print out ordered results
+                print("\n")
+                print("Label: {}".format(ordered_recipe[0]))
+                print("Link: {}".format(ordered_recipe[1]))
+                print("Calories: {}".format(ordered_recipe[2]))
+
+                # Append ordered results to outputted text file
+                file.write("Label: {}".format(ordered_recipe[0]))
+                file.write("\n")
+                file.write("Link: {}".format(ordered_recipe[1]))
+                file.write("\n")
+                file.write("Calories: {}".format(ordered_recipe[2]))
+                file.write("\n")
+                file.write("\n")
+
+    run()
+except:
+    print("Couldn't find any results! did you definitely spell everything correctly?")
